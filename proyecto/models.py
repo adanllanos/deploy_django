@@ -53,7 +53,7 @@ class Registrar_Laptop(models.Model):
 
 class vender_Laptop(models.Model):
     marca = models.CharField(max_length=20)
-    modelo = models.CharField(max_length=20,unique=True)     
+    modelo = models.CharField(max_length=20,unique=False)     
     cantidad = models.IntegerField()
     precio = models.IntegerField()
     fecha = models.DateField()

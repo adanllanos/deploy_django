@@ -82,7 +82,8 @@ def modificarLaptop(request, id):
         if 'imagen_4' in request.FILES:
             laptop.imagen_4 = request.FILES['imagen_4']
         laptop.save()
-        return redirect("laptops")
+        messages.success(request, f"¡La laptop {laptop.nombre} ha sido modificada exitosamente!")
+        return redirect("modificarLaptop", id=id)
 
 
 def error_404(request, exception):
@@ -136,33 +137,42 @@ def laptops(request):
 @login_required
 def venderLaptop(request, id=None):
     if request.method == 'GET':
-        laptop = Registrar_Laptop.objects.get(id = id)
+        laptop = Registrar_Laptop.objects.get(id=id)
         cadena_eliminar = 'proyecto/static/imagenes/'
-        ruta_1 = str(laptop.imagen_1).replace(cadena_eliminar,'')
-        ruta_2 = str(laptop.imagen_2).replace(cadena_eliminar,'')
-        ruta_3 = str(laptop.imagen_3).replace(cadena_eliminar,'')
-        ruta_4 = str(laptop.imagen_4).replace(cadena_eliminar,'')
-        return render(request, "venderlaptop.html",{
+        ruta_1 = str(laptop.imagen_1).replace(cadena_eliminar, '')
+        ruta_2 = str(laptop.imagen_2).replace(cadena_eliminar, '')
+        ruta_3 = str(laptop.imagen_3).replace(cadena_eliminar, '')
+        ruta_4 = str(laptop.imagen_4).replace(cadena_eliminar, '')
+        return render(request, "venderlaptop.html", {
             'laptop': laptop,
             'ruta_1': ruta_1,
             'ruta_2': ruta_2,
             'ruta_3': ruta_3,
             'ruta_4': ruta_4,
         })
-        
+
     else:
-        laptop = vender_Laptop.objects.create(
-            marca = request.POST['marca'],
-            modelo = request.POST['modelo'],
-            cantidad = request.POST['cantidad'],
-            precio = request.POST['precio'],
-            fecha = request.POST['fecha'],
-            cliente = request.POST['cliente'],
-            direccion = request.POST['direccion'],
-            ci = request.POST['ci'],
-            telefono = request.POST['telefono'],)
-        messages.success(request, f"¡La venta ha sido registrada exitosamente!")
-        return redirect("laptops")
+        laptop = Registrar_Laptop.objects.get(id=id)
+        cantidad_vendida = int(request.POST['cantidad'])
+        if cantidad_vendida > laptop.stock:
+            messages.error(request, f"No hay suficiente stock para vender {cantidad_vendida} unidades.")
+            return redirect('vender_laptop', id=laptop.id)
+        else:
+            laptop.stock -= cantidad_vendida
+            laptop.save()
+            laptop = vender_Laptop.objects.create(
+                marca=request.POST['marca'],
+                modelo=request.POST['modelo'],
+                cantidad=cantidad_vendida,
+                precio=request.POST['precio'],
+                fecha=request.POST['fecha'],
+                cliente=request.POST['cliente'],
+                direccion=request.POST['direccion'],
+                ci=request.POST['ci'],
+                telefono=request.POST['telefono'],
+            )
+            messages.success(request, f"¡La venta ha sido registrada exitosamente!")
+            return redirect("laptops")
         
 
 def signin(request):
