@@ -25,6 +25,10 @@ def usuarios(request):
     usuarios = registrar_usuario.objects.all()
     return render(request, "usuarios.html",{'usuarios':usuarios})
 
+@login_required
+def factura(request):
+    return render(request, "factura.html")
+
 
 @user_passes_test(lambda u: u.is_superuser, login_url='/403/')        
 
