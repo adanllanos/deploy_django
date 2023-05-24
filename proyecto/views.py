@@ -4,24 +4,123 @@ from django.shortcuts import get_object_or_404, render
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from .models import Registrar_Laptop
-from .models import vender_Laptop
+from .models import vender_Laptop, crear_factura
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import Q 
+from django.db.models import F, ExpressionWrapper, FloatField
+from django.shortcuts import render
+from .models import vender_Laptop, registrar_usuario
+from django.contrib.auth.models import User
 
 # Create your views here.
 def index(request):
     return render(request, "index.html")
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/403/')        
+def usuarios(request):
+    usuarios = registrar_usuario.objects.all()
+    return render(request, "usuarios.html",{'usuarios':usuarios})
 
+
+@user_passes_test(lambda u: u.is_superuser, login_url='/403/')        
+
+def usuarios(request):
+    usuarios = registrar_usuario.objects.all()
+    return render(request, "usuarios.html",{'usuarios':usuarios})
+
+def registro(request):
+    if request.method == 'POST':
+        nombemp = request.POST.get('nombemp')
+        ciemp = request.POST.get('ciemp')
+        usuario = request.POST.get('usuario')
+        password = request.POST.get('password')
+        confirmar_contraseña = request.POST.get('confirmar_password')
+
+        errors_dict = {}
+
+        # Verificar si los datos ya están registrados
+        if registrar_usuario.objects.filter(nombemp=nombemp).exists():
+            errors_dict['nombemp'] = 'El nombre de empleado ya está registrado.'
+        if registrar_usuario.objects.filter(ciemp=ciemp).exists():
+            errors_dict['ciemp'] = 'El CI ya está registrado.'
+        if registrar_usuario.objects.filter(usuario=usuario).exists():
+            errors_dict['usuario'] = 'El nombre de usuario ya está registrado.'
+
+        if password != confirmar_contraseña:
+            errors_dict['password'] = 'La contraseña y la confirmación de contraseña no coinciden.'
+
+        if len(errors_dict) == 0:
+            nuevo_usuario = registrar_usuario.objects.create(nombemp=nombemp, ciemp=ciemp, usuario=usuario, password=password)
+            nuevo_user = User.objects.create_user(username=usuario, password=password)
+            nuevo_usuario.save()
+            messages.success(request, f"¡El usuario ha sido registrada exitosamente!")
+            return redirect('registro')
+
+        context = {
+            'errors_dict': errors_dict,
+            'nombemp': nombemp,
+            'ciemp': ciemp,
+            'usuario': usuario
+        }
+        return render(request, "registro.html", context)
+
+    return render(request, "registro.html")
+
+@login_required
 def registroVentas(request):
-    ventas = vender_Laptop.objects.all()
+    ventas = vender_Laptop.objects.annotate(
+        total=ExpressionWrapper(F('cantidad') * F('precio'), output_field=FloatField())
+    ).order_by('fecha')
     return render(request, "registroVentas.html",{
-            'ventas': ventas
+        'ventas': ventas
+    })
+
+@login_required
+def registroFacturas(request):
+    facturas = crear_factura.objects.all()
+    return render(request, "registroFacturas.html",{
+            'facturas': facturas
         })
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/403/')
+def reporteVentas(request):
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+
+    if fecha_inicio and fecha_fin:
+        ventas = vender_Laptop.objects.filter(fecha__range=[fecha_inicio, fecha_fin])
+
+        no_ventas = False
+        if not ventas.exists():
+            no_ventas = True
+
+        ventas_suma = {}
+        for venta in ventas:
+            if venta.marca in ventas_suma:
+                ventas_suma[venta.marca]['cantidad'] += venta.cantidad
+                ventas_suma[venta.marca]['precio'] += venta.precio
+            else:
+                ventas_suma[venta.marca] = {
+                    'cantidad': venta.cantidad,
+                    'precio': venta.precio
+                }
+
+        context = {
+            'ventas': ventas_suma,
+            'no_ventas': no_ventas
+        }
+    else:
+        context = {}
+
+    return render(request, "reporte_ventas.html", context)
+
+
 
 # Create your views here.
 
@@ -29,10 +128,31 @@ def registroVentas(request):
 def informacionLaptop(request, id):
     laptop = Registrar_Laptop.objects.get(id = id)
     cadena_eliminar = 'proyecto'
-    ruta_1 = str(laptop.imagen_1).replace(cadena_eliminar,'')
-    ruta_2 = str(laptop.imagen_2).replace(cadena_eliminar,'')
-    ruta_3 = str(laptop.imagen_3).replace(cadena_eliminar,'')
-    ruta_4 = str(laptop.imagen_4).replace(cadena_eliminar,'')
+    cadena_eliminar2 = 'deploy_django/proyecto'
+    ruta_imagen1 = str(laptop.imagen_1)
+    ruta_imagen2 = str(laptop.imagen_2)
+    ruta_imagen3 = str(laptop.imagen_3)
+    ruta_imagen4 = str(laptop.imagen_4)
+
+    if "deploy" in ruta_imagen1:
+        ruta_1 = str(laptop.imagen_1).replace(cadena_eliminar2, '')
+    else:
+        ruta_1 = str(laptop.imagen_1).replace(cadena_eliminar, '')
+
+    if "deploy" in ruta_imagen2:
+        ruta_2 = str(laptop.imagen_2).replace(cadena_eliminar2, '')
+    else:
+        ruta_2 = str(laptop.imagen_2).replace(cadena_eliminar, '')
+
+    if "deploy" in ruta_imagen3:
+        ruta_3 = str(laptop.imagen_3).replace(cadena_eliminar2, '')
+    else:
+        ruta_3 = str(laptop.imagen_3).replace(cadena_eliminar, '')
+
+    if "deploy" in ruta_imagen4:
+        ruta_4 = str(laptop.imagen_4).replace(cadena_eliminar2, '')
+    else:
+        ruta_4 = str(laptop.imagen_4).replace(cadena_eliminar, '')
     return render(request, "informacionLaptop.html",{
         'laptop': laptop,
         'ruta_1': ruta_1,
@@ -42,6 +162,7 @@ def informacionLaptop(request, id):
     })
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/403/')        
 def modificarLaptop(request, id):
     if request.method == 'GET':
         laptop = Registrar_Laptop.objects.get(id = id)
@@ -82,7 +203,8 @@ def modificarLaptop(request, id):
         if 'imagen_4' in request.FILES:
             laptop.imagen_4 = request.FILES['imagen_4']
         laptop.save()
-        return redirect("laptops")
+        messages.success(request, f"¡La laptop {laptop.nombre} ha sido modificada exitosamente!")
+        return redirect("modificarLaptop", id=id)
 
 
 def error_404(request, exception):
@@ -106,8 +228,13 @@ def laptops(request):
         for laptop in laptops:
             ruta_fallida =  str(laptop.imagen_1)
             cadena_eliminar = 'proyecto'
-            ruta_correcta = ruta_fallida.replace(cadena_eliminar, '')
-            lista_rutas.append(ruta_correcta)
+            cadena_eliminar2 = 'deploy_django/proyecto'
+            if "deploy" in ruta_fallida:
+                ruta_correcta = ruta_fallida.replace(cadena_eliminar2, '')
+                lista_rutas.append(ruta_correcta)
+            else:
+                ruta_correcta = ruta_fallida.replace(cadena_eliminar, '')
+                lista_rutas.append(ruta_correcta)
             print(ruta_correcta)
             
         laptops_rutas = zip(laptops, lista_rutas)
@@ -200,3 +327,12 @@ def signout(request):
     logout(request)
     return redirect("index")
 
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/403/')
+def eliminarUsuario(request, id):
+    usuario = get_object_or_404(registrar_usuario, id=id)
+    usuario.delete()
+    messages.success(request, f"El usuario {usuario.usuario} ha sido eliminado exitosamente.")
+    return redirect("usuarios")
