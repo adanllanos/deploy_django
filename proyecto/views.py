@@ -25,10 +25,10 @@ def usuarios(request):
     usuarios = registrar_usuario.objects.all()
     return render(request, "usuarios.html",{'usuarios':usuarios})
 
+
 @login_required
 def factura(request):
     return render(request, "factura.html")
-
 
 @user_passes_test(lambda u: u.is_superuser, login_url='/403/')        
 
@@ -50,12 +50,12 @@ def registro(request):
         if registrar_usuario.objects.filter(nombemp=nombemp).exists():
             errors_dict['nombemp'] = 'El nombre de empleado ya está registrado.'
         if registrar_usuario.objects.filter(ciemp=ciemp).exists():
-            errors_dict['ciemp'] = 'El CI ya está registrado.'
+            errors_dict['ciemp'] = 'El CI proporcionado ya está asociado con una cuenta existente.'
         if registrar_usuario.objects.filter(usuario=usuario).exists():
-            errors_dict['usuario'] = 'El nombre de usuario ya está registrado.'
+            errors_dict['usuario'] = 'El nombre de usuario proporcionado ya está asociado con una cuenta existente.'
 
         if password != confirmar_contraseña:
-            errors_dict['password'] = 'La contraseña y la confirmación de contraseña no coinciden.'
+            errors_dict['password'] = 'La confirmación de contraseña no coincide con la contraseña ingresada.'
 
         if len(errors_dict) == 0:
             nuevo_usuario = registrar_usuario.objects.create(nombemp=nombemp, ciemp=ciemp, usuario=usuario, password=password)
@@ -117,7 +117,9 @@ def reporteVentas(request):
 
         context = {
             'ventas': ventas_suma,
-            'no_ventas': no_ventas
+            'no_ventas': no_ventas,
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin
         }
     else:
         context = {}
@@ -166,7 +168,7 @@ def informacionLaptop(request, id):
     })
 
 @login_required
-@user_passes_test(lambda u: u.is_superuser, login_url='/403/')        
+@user_passes_test(lambda u: u.is_superuser, login_url='/403/')
 def modificarLaptop(request, id):
     if request.method == 'GET':
         laptop = Registrar_Laptop.objects.get(id = id)
@@ -210,7 +212,6 @@ def modificarLaptop(request, id):
         messages.success(request, f"¡La laptop {laptop.nombre} ha sido modificada exitosamente!")
         return redirect("modificarLaptop", id=id)
 
-
 def error_404(request, exception):
     return render(request, '403.html', status=404)
 
@@ -240,7 +241,7 @@ def laptops(request):
                 ruta_correcta = ruta_fallida.replace(cadena_eliminar, '')
                 lista_rutas.append(ruta_correcta)
             print(ruta_correcta)
-            
+
         laptops_rutas = zip(laptops, lista_rutas)
         return render(request, "laptops.html",{
             'laptops_rutas': laptops_rutas
@@ -267,7 +268,7 @@ def laptops(request):
             imagen_4 = request.FILES['imagen_4'])
         messages.success(request, f"¡La laptop {laptop.nombre} ha sido registrada exitosamente!")
         return redirect("laptops")
-    
+ 
 @login_required
 def venderLaptop(request, id=None):
     if request.method == 'GET':
@@ -338,5 +339,4 @@ def signout(request):
 def eliminarUsuario(request, id):
     usuario = get_object_or_404(registrar_usuario, id=id)
     usuario.delete()
-    messages.success(request, f"El usuario {usuario.usuario} ha sido eliminado exitosamente.")
     return redirect("usuarios")
